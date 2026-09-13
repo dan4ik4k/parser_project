@@ -1,7 +1,7 @@
 import csv
 import os
 import uuid
-from config import CSV_FILE_PATH
+from config import CSV_FILE_PATH, BASE_DIR
 
 FIELDNAMES = [
     'id', 'source', 'name', 'phone', 'has_website', 
@@ -53,6 +53,44 @@ def save_lead(lead_data: dict):
     with open(CSV_FILE_PATH, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES, delimiter=';')
         writer.writerow(lead_data)
+
+PARSED_URLS_FILE = BASE_DIR / "parsed_urls.txt"
+
+def get_parsed_urls() -> set[str]:
+    """Возвращает множество всех уже пройденных URL карточек."""
+    urls = set()
+    
+    # 1. Чтение из файла истории проверенных карточек
+    if PARSED_URLS_FILE.exists():
+        with open(PARSED_URLS_FILE, 'r', encoding='utf-8') as f:
+            for line in f:
+                url = line.strip()
+                if url:
+                    urls.add(url)
+
+    # 2. Чтение из существующей базы data.csv
+    if os.path.exists(CSV_FILE_PATH):
+        with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f, delimiter=';')
+            for row in reader:
+                yurl = row.get('yandex_url', '').strip()
+                if yurl:
+                    urls.add(yurl)
+
+    return urls
+
+def add_parsed_url(url: str):
+    """Записывает обработанный URL в память."""
+    if not url:
+        return
+    with open(PARSED_URLS_FILE, mode='a', encoding='utf-8') as f:
+        f.write(url.strip() + '\n')
+
+def clear_parsed_urls():
+    """Очищает память пройденных карточек."""
+    if PARSED_URLS_FILE.exists():
+        with open(PARSED_URLS_FILE, mode='w', encoding='utf-8') as f:
+            f.write('')
 
 def is_phone_exists(phone: str) -> bool:
     """Проверяет, есть ли уже такой телефон в базе (чтобы не парсить дубли)."""

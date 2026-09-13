@@ -3,56 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Лиды | CRM Dashboard</title>
+    <title>Панель менеджера | CRM</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="glass-background"></div>
-    
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <span class="nav-logo">⚡ CRM</span>
+            <span class="nav-badge manager-badge">Менеджер</span>
+        </div>
+        <div class="nav-right">
+            <span class="nav-user">{{ user.display_name }}</span>
+            <span class="nav-commission">{{ user.commission_rate }}%</span>
+            <a href="/logout" class="btn btn-ghost btn-sm">Выйти</a>
+        </div>
+    </nav>
+
     <div class="container">
-        <header>
-            <h1>База Лидов <span>B2B Sales</span></h1>
-            
-            <div class="controls">
+        <!-- STATS CARDS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="statMyLeads">{{ stats.total_leads }}</div>
+                <div class="stat-label">Моих клиентов</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value warning" id="statActiveLeads">{{ stats.active_leads }}</div>
+                <div class="stat-label">В работе</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value success" id="statDeals">{{ stats.deals_count }}</div>
+                <div class="stat-label">Сделок</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value success" id="statAmount">{{ "%.0f"|format(stats.total_amount) }} ₽</div>
+                <div class="stat-label">Общая сумма</div>
+            </div>
+            <div class="stat-card highlight-card">
+                <div class="stat-value" id="statCommission">{{ "%.0f"|format(stats.total_commission) }} ₽</div>
+                <div class="stat-label">💰 Мой заработок</div>
+            </div>
+        </div>
+
+        <!-- REFERRAL LINK -->
+        <div class="ref-link-bar">
+            <span>Моя реферальная ссылка:</span>
+            <code id="refLink"></code>
+            <button class="btn btn-sm btn-secondary" id="copyRefBtn">📋 Скопировать</button>
+        </div>
+
+        <!-- TABS -->
+        <div class="tabs">
+            <button class="tab active" data-tab="free">🆓 Свободные клиенты</button>
+            <button class="tab" data-tab="my">📞 Мои клиенты</button>
+            <button class="tab" data-tab="mydeals">💰 Мои сделки</button>
+        </div>
+
+        <!-- TAB: FREE LEADS -->
+        <div class="tab-content active" id="tab-free">
+            <div class="controls" style="margin-bottom: 1rem;">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Поиск по названию или телефону...">
-                </div>
-                <div class="filter-box">
-                    <label class="custom-checkbox">
-                        <input type="checkbox" id="noWebsiteFilter">
-                        <span class="checkmark"></span>
-                        Только без сайта
-                    </label>
+                    <input type="text" id="freeSearch" placeholder="Поиск по названию...">
                 </div>
                 <div class="stats">
-                    Всего карточек: <span id="totalCount">0</span>
+                    Свободных: <span id="freeCount">0</span>
                 </div>
             </div>
-        </header>
-
-        <main>
             <div class="table-container">
-                <table id="leadsTable">
+                <table>
                     <thead>
                         <tr>
                             <th>Название и Адрес</th>
                             <th>Рейтинг</th>
                             <th>Телефон</th>
-                            <th>Сайт компании</th>
-                            <th>Яндекс Карты</th>
-                            <th>Статус звонка (ML)</th>
-                            <th>Действия</th>
+                            <th>Ссылки</th>
+                            <th>Действие</th>
                         </tr>
                     </thead>
-                    <tbody id="tableBody">
-                        <!-- Контент загружается через JS -->
+                    <tbody id="freeTableBody">
+                        <tr><td colspan="5" class="loading">Загрузка...</td></tr>
                     </tbody>
                 </table>
             </div>
-        </main>
+        </div>
+
+        <!-- TAB: MY LEADS -->
+        <div class="tab-content" id="tab-my">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Название и Адрес</th>
+                            <th>Телефон</th>
+                            <th>Ссылки</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="myTableBody">
+                        <tr><td colspan="5" class="loading">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: MY DEALS -->
+        <div class="tab-content" id="tab-mydeals">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Клиент</th>
+                            <th>Сумма сделки</th>
+                            <th>Комиссия %</th>
+                            <th>Мой заработок</th>
+                            <th>Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody id="myDealsTableBody">
+                        <tr><td colspan="5" class="loading">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
+    <!-- DEAL MODAL -->
+    <div class="modal-overlay" id="dealModal">
+        <div class="modal-card">
+            <h3>💰 Оформление сделки</h3>
+            <p class="modal-lead-name" id="dealLeadName"></p>
+            <div class="form-group">
+                <label for="dealAmount">Сумма сделки (₽)</label>
+                <input type="number" id="dealAmount" placeholder="Введите сумму" min="1" step="100">
+            </div>
+            <div class="modal-commission" id="dealPreview">
+                Ваша комиссия ({{ user.commission_rate }}%): <strong id="dealCommPreview">0 ₽</strong>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="dealCancel">Отмена</button>
+                <button class="btn btn-primary" id="dealConfirm">Подтвердить сделку</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CURRENT_USERNAME = "{{ user.username }}";
+        const COMMISSION_RATE = {{ user.commission_rate }};
+    </script>
     <script src="/static/app.js"></script>
 </body>
 </html>

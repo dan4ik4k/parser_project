@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import re
 from playwright.sync_api import sync_playwright
 import config
 import storage
@@ -20,12 +21,26 @@ def run_scraper(page, target_url, limit):
         
     logger.info(f"Начинаем обход {len(links)} карточек...")
     
+    # Память парсера: загружаем множество уже обработанных URL
+    parsed_urls = storage.get_parsed_urls()
+    
     # Шаг 2. Обход каждой карточки
     for i, url in enumerate(links, 1):
+        clean_url = re.sub(r"(/org/[^/]+/\d+/).*", r"\1", url)
+        
+        # Если ссылка уже обрабатывалась в этом или предыдущих запусках - пропускаем мгновенно
+        if clean_url in parsed_urls or url in parsed_urls:
+            logger.info(f"--- Карточка [{i}/{len(links)}] уже обрабатывалась ранее. Пропускаем. ---")
+            continue
+
         logger.info(f"--- Карточка [{i}/{len(links)}] ---")
         try:
             lead_data = scraper.parse_card(url)
             
+            # Сохраняем карточку в память как обработанную
+            storage.add_parsed_url(clean_url)
+            parsed_urls.add(clean_url)
+
             # Фильтр: только организации без веб-сайтов
             if config.ONLY_WITHOUT_WEBSITE and lead_data.get('has_website') == 1:
                 logger.info(f"У компании '{lead_data.get('name')}' есть сайт ({lead_data.get('website_url')}). Пропускаем по фильтру...")

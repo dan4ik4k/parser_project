@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ожидание | CRM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="glass-background"></div>
+
+    <div class="auth-wrapper">
+        <div class="auth-card pending-card">
+            <div class="pending-icon">⏳</div>
+            <h2>Ожидание подтверждения</h2>
+            <p class="pending-text">
+                Здравствуйте, <strong>{{ user.display_name }}</strong>!<br><br>
+                Ваша заявка на доступ к базе клиентов отправлена администратору.
+                Как только ваш аккаунт будет одобрен, вы получите доступ к системе.
+            </p>
+            <div class="pending-status">
+                <div class="status-dot pending-dot"></div>
+                <span>Статус: Ожидание одобрения</span>
+            </div>
+            <button class="btn btn-secondary btn-block" onclick="location.reload()" style="margin-top: 1.5rem;">
+                🔄 Проверить статус
+            </button>
+            <a href="/logout" class="btn btn-ghost btn-block" style="margin-top: 0.75rem;">Выйти</a>
+        </div>
+    </div>
+</body>
+</html>

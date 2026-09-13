@@ -3,3 +3,5 @@ __pycache__/
 playwright_profile/
 .vscode/
 .idea/
+admin_credentials.txt
+database.db

@@ -9,38 +9,46 @@ logger = logging.getLogger(__name__)
 
 # Домены соцсетей, мессенджеров, CRM-систем онлайн-записи и агрегаторов, которые НЕ являются официальным самостоятельным веб-сайтом компании
 EXCLUDED_DOMAINS = [
-    # Мессенджеры и соцсети
-    'wa.me', 'whatsapp.com', 'api.whatsapp',
-    't.me', 'telegram.me', 'telegram.org',
-    'vk.com', 'vk.me', 'vkontakte',
-    'instagram.com', 'instagr.am',
+    # Соцсети и мессенджеры (все зеркала и домены)
+    'vk.ru', 'vk.com', 'vk.me', 'vk.link', 'vk.site', 'vkontakte.ru', 'vkontakte',
+    'wa.me', 'whatsapp.com', 'whatsapp.ru', 'api.whatsapp', 'whatsapp',
+    't.me', 'telegram.me', 'telegram.org', 'telegram',
+    'instagram.com', 'instagr.am', 'instagram',
     'viber.click', 'viber.me', 'viber',
-    'youtube.com', 'youtu.be',
-    'ok.ru', 'odnoklassniki',
-    'facebook.com', 'fb.com', 'fb.me',
-    'taplink.cc', 'linktr.ee', 'mssg.me', 'hipolink.me',
-    'yandex.ru', 'yandex.com', 'ya.ru', '2gis.ru', 'google.com', 'maps.google',
-    'dzen.ru', 'zen.yandex.ru', 'rutube.ru',
+    'youtube.com', 'youtu.be', 'youtube',
+    'ok.ru', 'odnoklassniki.ru', 'odnoklassniki',
+    'facebook.com', 'fb.com', 'fb.me', 'facebook',
+    'dzen.ru', 'zen.yandex.ru', 'rutube.ru', 'rutube',
+    'tiktok.com', 'pinterest.com',
 
-    # Системы онлайн-записи и CRM (YClients, Dikidi, Altegio и аналоги)
+    # Системы онлайн-записи, CRM и SaaS платформы (YClients, Dikidi, Altegio, Beauty-SaaS и аналоги)
     'yclients.com', 'yclients.ru', 'yclients.by', 'yclients.site', 'yclients',
     'alteg.io', 'altegio.com', 'altegio',
-    'dikidi.ru', 'dikidi.net', 'dikidi.online', 'dikidi.ws', 'dikidi',
-    'gbooking.ru', 'sonline.su', 'arnica.pro', 'rubitime.ru',
+    'dikidi.ru', 'dikidi.net', 'dikidi.online', 'dikidi.ws', 'dikidi.me', 'dikidi',
+    'beauty-saas.ru', 'beauty-saas', 'beautysaas', 'saas',
+    'clients.site', 'gbooking.ru', 'sonline.su', 'arnica.pro', 'rubitime.ru', 'moiprofi.ru',
     'mst.link', 'reservio.com', 'calendly.com', 'fresha.com',
     'simplybook.me', 'simplybook.it', 'appointy.com',
     'bitrix24.ru', 'bitrix24.site', 'amocrm.ru', 'planfix.ru', 'planfix.com',
+    'cleverbox.cc', 'synergycrm.ru', 'yoolla.ru', 'zoho.com',
 
-    # Агрегаторы и доски объявлений
+    # Конструкторы мультиссылок и автовизитки
+    'taplink.cc', 'taplink.ru', 'linktr.ee', 'mssg.me', 'hipolink.me', 'taplink', 'tilda.ws',
+
+    # Поисковики, карты и справочники
+    'yandex.ru', 'yandex.com', 'ya.ru', '2gis.ru', '2gis.com', 'google.com', 'maps.google',
     'profi.ru', 'profy.ru', 'zoon.ru', 'flamp.ru', 'yell.ru', 'avito.ru', 'blizko.ru', 'tiu.ru', 'orgpage.ru'
 ]
 
 def clean_and_check_website_url(href: str) -> str:
-    """Извлекает прямой URL и проверяет, что это не мессенджер/соцсеть."""
+    """Извлекает прямой URL и проверяет, что это не мессенджер/соцсеть/CRM/SaaS."""
     if not href:
         return ""
     
-    # Расшифровка редиректов Яндекса (например /clck/jsredir?url=http...)
+    # 1. Раскодирование URL
+    href = urllib.parse.unquote(href)
+    
+    # 2. Расшифровка редиректов Яндекса (например /clck/jsredir?url=http...)
     if "url=" in href:
         try:
             parsed = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
@@ -53,8 +61,15 @@ def clean_and_check_website_url(href: str) -> str:
         return ""
 
     href_lower = href.lower()
+
+    # 3. Извлечение имени домена для точной проверки
+    try:
+        domain_name = urllib.parse.urlparse(href_lower).netloc.replace('www.', '')
+    except Exception:
+        domain_name = href_lower
+
     for domain in EXCLUDED_DOMAINS:
-        if domain in href_lower:
+        if domain in href_lower or domain in domain_name:
             return ""
 
     return href
