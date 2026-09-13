@@ -15,7 +15,7 @@ from models import (
     get_free_leads, get_leads_by_manager, get_all_leads,
     claim_lead, release_lead, update_lead_status, reassign_lead,
     create_deal, get_deals_by_manager, get_all_deals,
-    get_manager_stats, get_admin_stats
+    get_manager_stats, get_admin_stats, get_user_cooldown
 )
 
 # ─── App config ──────────────────────────────────────────────────
@@ -190,6 +190,12 @@ def admin_panel():
 # ═════════════════════════════════════════════════════════════════
 #  API – LEADS (manager)
 # ═════════════════════════════════════════════════════════════════
+
+@app.route('/api/cooldown')
+@login_required
+def api_cooldown():
+    return jsonify({'cooldown': get_user_cooldown(current_user.id, 60)})
+
 
 @app.route('/api/leads/free')
 @login_required

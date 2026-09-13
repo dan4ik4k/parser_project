@@ -26,6 +26,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let freeLeads = [];
     let myLeads = [];
     let hasActiveLead = false;
+    let cooldownRemaining = 0;
+    let cooldownTimer = null;
+
+    // ── Cooldown check ───────────────────────────────────────────
+    async function checkCooldown() {
+        try {
+            const r = await fetch('/api/cooldown');
+            const data = await r.json();
+            cooldownRemaining = data.cooldown || 0;
+            startCooldownTimer();
+        } catch(e) {}
+    }
+
+    function startCooldownTimer() {
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        renderFreeTable();
+        if (cooldownRemaining > 0) {
+            cooldownTimer = setInterval(() => {
+                cooldownRemaining--;
+                renderFreeTable();
+                if (cooldownRemaining <= 0) {
+                    clearInterval(cooldownTimer);
+                    cooldownTimer = null;
+                }
+            }, 1000);
+        }
+    }
 
     // ── Load free leads ──────────────────────────────────────────
     async function loadFreeLeads() {
@@ -77,6 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>
                     ${hasActiveLead
                         ? '<span style="color:var(--text-muted);font-size:.8rem">Завершите текущего клиента</span>'
+                        : cooldownRemaining > 0
+                        ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.75">⏳ КД: ${cooldownRemaining} сек</button>`
                         : `<button class="btn btn-claim btn-sm" onclick="claimLead('${l.id}')">🚀 Взять клиента</button>`
                     }
                 </td>
@@ -146,11 +175,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const r = await fetch(`/api/leads/${id}/claim`, { method: 'POST' });
             const data = await r.json();
             if (data.success) {
+                checkCooldown();
                 loadFreeLeads();
                 loadMyLeads();
                 refreshStats();
             } else {
                 alert(data.error || 'Не удалось взять клиента');
+                checkCooldown();
             }
         } catch(e) { alert('Ошибка сети'); }
     };
@@ -158,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.releaseLead = async function(id) {
         if (!confirm('Вернуть клиента в свободный пул?')) return;
         await fetch(`/api/leads/${id}/release`, { method: 'POST' });
+        checkCooldown();
         loadFreeLeads();
         loadMyLeads();
         refreshStats();
@@ -169,6 +201,9 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
         });
+        if (status === 'refused') {
+            checkCooldown();
+        }
         loadMyLeads();
     };
 
@@ -209,6 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await r.json();
             if (data.success) {
                 modal.classList.remove('show');
+                checkCooldown();
                 loadMyLeads();
                 loadMyDeals();
                 refreshStats();
@@ -280,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('freeSearch')?.addEventListener('input', renderFreeTable);
 
     // ── Init ─────────────────────────────────────────────────────
+    checkCooldown();
     loadMyLeads();   // load first to set hasActiveLead before rendering free table
     loadFreeLeads();
     loadMyDeals();

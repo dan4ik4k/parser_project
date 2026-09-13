@@ -32,6 +32,7 @@ def init_db():
             status TEXT NOT NULL DEFAULT 'pending',
             commission_rate REAL NOT NULL DEFAULT 15.0,
             referred_by TEXT DEFAULT NULL,
+            last_lead_claimed_at TIMESTAMP DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -67,6 +68,10 @@ def init_db():
             FOREIGN KEY (manager_id) REFERENCES users(id)
         );
     ''')
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN last_lead_claimed_at TIMESTAMP DEFAULT NULL")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -205,8 +210,28 @@ def get_all_leads():
     return leads
 
 
+def get_user_cooldown(user_id, cooldown_seconds=60):
+    """Returns remaining cooldown seconds for a user (0 if ready)."""
+    conn = get_db()
+    user = conn.execute("SELECT last_lead_claimed_at FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not user or not user['last_lead_claimed_at']:
+        return 0
+    try:
+        val = user['last_lead_claimed_at']
+        if isinstance(val, str):
+            last_time = datetime.fromisoformat(val)
+        else:
+            return 0
+        elapsed = (datetime.now() - last_time).total_seconds()
+        remaining = cooldown_seconds - elapsed
+        return max(0, int(remaining))
+    except Exception:
+        return 0
+
+
 def claim_lead(lead_id, manager_id):
-    """Atomically claim a free lead for the given manager (taxi-style). Limit: 1 active client."""
+    """Atomically claim a free lead for the given manager (taxi-style). Limit: 1 active client. 1-min cooldown."""
     conn = get_db()
     active = conn.execute(
         "SELECT COUNT(*) FROM leads WHERE assigned_to = ? AND status IN ('taken','in_progress','callback')",
@@ -215,15 +240,24 @@ def claim_lead(lead_id, manager_id):
     if active > 0:
         conn.close()
         return False, "У вас уже есть активный клиент. Завершите работу с ним, прежде чем брать нового."
+
+    cooldown = get_user_cooldown(manager_id, 60)
+    if cooldown > 0:
+        conn.close()
+        return False, f"Перезарядка! Подождите {cooldown} сек. перед взятием следующего клиента."
+
     lead = conn.execute("SELECT status FROM leads WHERE id = ?", (lead_id,)).fetchone()
     if not lead or lead['status'] != 'free':
         conn.close()
         return False, "Клиент уже занят другим менеджером"
+
+    now_iso = datetime.now().isoformat()
     conn.execute(
         "UPDATE leads SET status = 'taken', assigned_to = ?, assigned_at = ? "
         "WHERE id = ? AND status = 'free'",
-        (manager_id, datetime.now().isoformat(), lead_id)
+        (manager_id, now_iso, lead_id)
     )
+    conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (now_iso, manager_id))
     conn.commit()
     updated = conn.execute("SELECT assigned_to FROM leads WHERE id = ?", (lead_id,)).fetchone()
     conn.close()
@@ -234,6 +268,7 @@ def claim_lead(lead_id, manager_id):
 
 def release_lead(lead_id, manager_id=None, is_admin=False):
     conn = get_db()
+    now_iso = datetime.now().isoformat()
     if is_admin:
         conn.execute(
             "UPDATE leads SET status = 'free', assigned_to = NULL, assigned_at = NULL WHERE id = ?",
@@ -245,6 +280,8 @@ def release_lead(lead_id, manager_id=None, is_admin=False):
             "WHERE id = ? AND assigned_to = ?",
             (lead_id, manager_id)
         )
+        if manager_id:
+            conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (now_iso, manager_id))
     conn.commit()
     conn.close()
 
@@ -258,6 +295,8 @@ def update_lead_status(lead_id, new_status, manager_id=None, is_admin=False):
             "UPDATE leads SET status = ? WHERE id = ? AND assigned_to = ?",
             (new_status, lead_id, manager_id)
         )
+        if manager_id and new_status == 'refused':
+            conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (datetime.now().isoformat(), manager_id))
     conn.commit()
     conn.close()
 
@@ -279,12 +318,14 @@ def create_deal(lead_id, manager_id, amount):
     user = conn.execute("SELECT commission_rate FROM users WHERE id = ?", (manager_id,)).fetchone()
     rate = user['commission_rate'] if user else 15.0
     commission = round(amount * rate / 100.0, 2)
+    now_iso = datetime.now().isoformat()
     conn.execute(
         "INSERT INTO deals (lead_id, manager_id, amount, commission_rate, commission_amount) "
         "VALUES (?, ?, ?, ?, ?)",
         (lead_id, manager_id, amount, rate, commission)
     )
     conn.execute("UPDATE leads SET status = 'deal', deal_amount = ? WHERE id = ?", (amount, lead_id))
+    conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (now_iso, manager_id))
     conn.commit()
     conn.close()
     return commission
