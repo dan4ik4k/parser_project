@@ -167,21 +167,50 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDeals(deals) {
         const tbody = document.getElementById('dealsTableBody');
         if (!deals.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">Пока нет сделок</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">Пока нет сделок</td></tr>';
             return;
         }
-        tbody.innerHTML = deals.map(d => `
-            <tr>
-                <td class="name-cell">${esc(d.lead_name)}<div class="address">${esc(d.lead_phone)}</div></td>
-                <td class="link-group">${dealLinksHtml(d)}</td>
-                <td style="color:var(--accent-hover)">${esc(d.manager_name)}</td>
-                <td><strong>${Number(d.amount).toLocaleString('ru')} ₽</strong></td>
-                <td>${d.commission_rate}%</td>
-                <td style="color:var(--success);font-weight:600">${Number(d.commission_amount).toLocaleString('ru')} ₽</td>
-                <td style="color:var(--text-muted);font-size:.85rem">${formatDate(d.created_at)}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = deals.map(d => {
+            const statusBadge = d.status === 'approved' 
+                ? '<span class="status-badge status-approved" style="background:#1e3a29;color:#4ade80">✅ Одобрена</span>'
+                : d.status === 'rejected'
+                ? '<span class="status-badge status-rejected" style="background:#3b1819;color:#f87171">❌ Отклонена</span>'
+                : '<span class="status-badge status-pending" style="background:#3a2e1e;color:#facc15">⏳ На проверке</span>';
+
+            const actions = (d.status === 'pending' || !d.status) ? `
+                <button class="btn btn-success btn-inline" style="padding:.25rem .5rem;font-size:.78rem" onclick="approveDeal(${d.id})">✅ Одобрить</button>
+                <button class="btn btn-danger btn-inline" style="padding:.25rem .5rem;font-size:.78rem" onclick="rejectDeal(${d.id})">❌ Отклонить</button>
+            ` : '—';
+
+            return `
+                <tr>
+                    <td class="name-cell">${esc(d.lead_name)}<div class="address">${esc(d.lead_phone)}</div></td>
+                    <td class="link-group">${dealLinksHtml(d)}</td>
+                    <td style="color:var(--accent-hover)">${esc(d.manager_name)}</td>
+                    <td><strong>${Number(d.amount).toLocaleString('ru')} ₽</strong></td>
+                    <td>${d.commission_rate}%</td>
+                    <td style="color:var(--success);font-weight:600">${Number(d.commission_amount).toLocaleString('ru')} ₽</td>
+                    <td style="color:var(--text-muted);font-size:.85rem">${formatDate(d.created_at)}</td>
+                    <td>${statusBadge}</td>
+                    <td class="action-cell">${actions}</td>
+                </tr>
+            `;
+        }).join('');
     }
+
+    window.approveDeal = async function(id) {
+        if (!confirm('Одобрить эту сделку?')) return;
+        await fetch(`/api/admin/deals/${id}/approve`, { method: 'POST' });
+        loadDeals();
+        loadStats();
+    };
+
+    window.rejectDeal = async function(id) {
+        if (!confirm('Отклонить сделку? Клиент вернется менеджеру.')) return;
+        await fetch(`/api/admin/deals/${id}/reject`, { method: 'POST' });
+        loadDeals();
+        loadStats();
+    };
 
     // ═══════════════════════════════════════════════════════════
     //  HELPERS

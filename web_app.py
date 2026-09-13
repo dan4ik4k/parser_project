@@ -14,7 +14,7 @@ from models import (
     update_user_status, update_user_commission,
     get_free_leads, get_leads_by_manager, get_all_leads,
     claim_lead, release_lead, update_lead_status, reassign_lead,
-    create_deal, get_deals_by_manager, get_all_deals,
+    create_deal, get_deals_by_manager, get_all_deals, approve_deal, reject_deal,
     get_manager_stats, get_admin_stats, get_user_cooldown,
     import_leads_csv
 )
@@ -350,6 +350,20 @@ def api_import_leads():
 @admin_required
 def api_admin_deals():
     return jsonify([dict(d) for d in get_all_deals()])
+
+
+@app.route('/api/admin/deals/<int:deal_id>/approve', methods=['POST'])
+@admin_required
+def api_admin_approve_deal(deal_id):
+    approve_deal(deal_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/deals/<int:deal_id>/reject', methods=['POST'])
+@admin_required
+def api_admin_reject_deal(deal_id):
+    reject_deal(deal_id)
+    return jsonify({'success': True})
 
 
 @app.route('/api/deals/my')

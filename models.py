@@ -72,6 +72,10 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN last_lead_claimed_at TIMESTAMP DEFAULT NULL")
     except sqlite3.OperationalError:
         pass
+    try:
+        conn.execute("ALTER TABLE deals ADD COLUMN status TEXT DEFAULT 'pending'")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -331,7 +335,6 @@ def claim_lead(lead_id, manager_id):
 
 def release_lead(lead_id, manager_id=None, is_admin=False):
     conn = get_db()
-    now_iso = datetime.now().isoformat()
     if is_admin:
         conn.execute(
             "UPDATE leads SET status = 'free', assigned_to = NULL, assigned_at = NULL WHERE id = ?",
@@ -343,8 +346,6 @@ def release_lead(lead_id, manager_id=None, is_admin=False):
             "WHERE id = ? AND assigned_to = ?",
             (lead_id, manager_id)
         )
-        if manager_id:
-            conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (now_iso, manager_id))
     conn.commit()
     conn.close()
 
@@ -358,8 +359,6 @@ def update_lead_status(lead_id, new_status, manager_id=None, is_admin=False):
             "UPDATE leads SET status = ? WHERE id = ? AND assigned_to = ?",
             (new_status, lead_id, manager_id)
         )
-        if manager_id and new_status == 'refused':
-            conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (datetime.now().isoformat(), manager_id))
     conn.commit()
     conn.close()
 
@@ -383,15 +382,34 @@ def create_deal(lead_id, manager_id, amount):
     commission = round(amount * rate / 100.0, 2)
     now_iso = datetime.now().isoformat()
     conn.execute(
-        "INSERT INTO deals (lead_id, manager_id, amount, commission_rate, commission_amount) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO deals (lead_id, manager_id, amount, commission_rate, commission_amount, status) "
+        "VALUES (?, ?, ?, ?, ?, 'pending')",
         (lead_id, manager_id, amount, rate, commission)
     )
-    conn.execute("UPDATE leads SET status = 'deal', deal_amount = ? WHERE id = ?", (amount, lead_id))
-    conn.execute("UPDATE users SET last_lead_claimed_at = ? WHERE id = ?", (now_iso, manager_id))
+    conn.execute("UPDATE leads SET status = 'deal_pending', deal_amount = ? WHERE id = ?", (amount, lead_id))
     conn.commit()
     conn.close()
     return commission
+
+
+def approve_deal(deal_id):
+    conn = get_db()
+    deal = conn.execute("SELECT lead_id FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if deal:
+        conn.execute("UPDATE deals SET status = 'approved' WHERE id = ?", (deal_id,))
+        conn.execute("UPDATE leads SET status = 'deal' WHERE id = ?", (deal['lead_id'],))
+        conn.commit()
+    conn.close()
+
+
+def reject_deal(deal_id):
+    conn = get_db()
+    deal = conn.execute("SELECT lead_id FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if deal:
+        conn.execute("UPDATE deals SET status = 'rejected' WHERE id = ?", (deal_id,))
+        conn.execute("UPDATE leads SET status = 'taken', deal_amount = NULL WHERE id = ?", (deal['lead_id'],))
+        conn.commit()
+    conn.close()
 
 
 def get_deals_by_manager(manager_id):
@@ -435,11 +453,11 @@ def get_manager_stats(manager_id):
         (manager_id,)
     ).fetchone()[0]
     s['deals_count'] = conn.execute(
-        "SELECT COUNT(*) FROM deals WHERE manager_id = ?", (manager_id,)
+        "SELECT COUNT(*) FROM deals WHERE manager_id = ? AND status = 'approved'", (manager_id,)
     ).fetchone()[0]
     row = conn.execute(
         "SELECT COALESCE(SUM(amount),0) AS ta, COALESCE(SUM(commission_amount),0) AS tc "
-        "FROM deals WHERE manager_id = ?", (manager_id,)
+        "FROM deals WHERE manager_id = ? AND status = 'approved'", (manager_id,)
     ).fetchone()
     s['total_amount'] = row['ta']
     s['total_commission'] = row['tc']

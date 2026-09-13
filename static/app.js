@@ -164,19 +164,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderMyDeals(deals) {
         const tbody = document.getElementById('myDealsTableBody');
         if (!deals.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">Пока нет сделок</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">Пока нет сделок</td></tr>';
             return;
         }
-        tbody.innerHTML = deals.map(d => `
-            <tr>
-                <td class="name-cell">${esc(d.lead_name)}<div class="address">${esc(d.lead_phone)}</div></td>
-                <td class="link-group">${dealLinksHtml(d)}</td>
-                <td><strong>${Number(d.amount).toLocaleString('ru')} ₽</strong></td>
-                <td>${d.commission_rate}%</td>
-                <td style="color:var(--success);font-weight:600">${Number(d.commission_amount).toLocaleString('ru')} ₽</td>
-                <td style="color:var(--text-muted);font-size:.85rem">${formatDate(d.created_at)}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = deals.map(d => {
+            const statusBadge = d.status === 'approved' 
+                ? '<span class="status-badge status-approved" style="background:#1e3a29;color:#4ade80">✅ Подтверждена</span>'
+                : d.status === 'rejected'
+                ? '<span class="status-badge status-rejected" style="background:#3b1819;color:#f87171">❌ Отклонена</span>'
+                : '<span class="status-badge status-pending" style="background:#3a2e1e;color:#facc15">⏳ На проверке</span>';
+
+            return `
+                <tr>
+                    <td class="name-cell">${esc(d.lead_name)}<div class="address">${esc(d.lead_phone)}</div></td>
+                    <td class="link-group">${dealLinksHtml(d)}</td>
+                    <td><strong>${Number(d.amount).toLocaleString('ru')} ₽</strong></td>
+                    <td>${d.commission_rate}%</td>
+                    <td style="color:var(--success);font-weight:600">${Number(d.commission_amount).toLocaleString('ru')} ₽</td>
+                    <td style="color:var(--text-muted);font-size:.85rem">${formatDate(d.created_at)}</td>
+                    <td>${statusBadge}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     // ── Actions ──────────────────────────────────────────────────
@@ -199,7 +208,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.releaseLead = async function(id) {
         if (!confirm('Вернуть клиента в свободный пул?')) return;
         await fetch(`/api/leads/${id}/release`, { method: 'POST' });
-        checkCooldown();
         loadFreeLeads();
         loadMyLeads();
         refreshStats();
@@ -211,9 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
         });
-        if (status === 'refused') {
-            checkCooldown();
-        }
         loadMyLeads();
     };
 
@@ -254,7 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await r.json();
             if (data.success) {
                 modal.classList.remove('show');
-                checkCooldown();
                 loadMyLeads();
                 loadMyDeals();
                 refreshStats();
@@ -318,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function statusLabel(s) {
-        const m = { free:'Свободен', taken:'Взят', in_progress:'В работе', callback:'Перезвонить', deal:'Сделка', refused:'Отказ' };
+        const m = { free:'Свободен', taken:'Взят', in_progress:'В работе', callback:'Перезвонить', deal:'Сделка', deal_pending:'На проверке', refused:'Отказ' };
         return m[s] || s;
     }
 
