@@ -206,8 +206,15 @@ def get_all_leads():
 
 
 def claim_lead(lead_id, manager_id):
-    """Atomically claim a free lead for the given manager (taxi-style)."""
+    """Atomically claim a free lead for the given manager (taxi-style). Limit: 1 active client."""
     conn = get_db()
+    active = conn.execute(
+        "SELECT COUNT(*) FROM leads WHERE assigned_to = ? AND status IN ('taken','in_progress','callback')",
+        (manager_id,)
+    ).fetchone()[0]
+    if active > 0:
+        conn.close()
+        return False, "У вас уже есть активный клиент. Завершите работу с ним, прежде чем брать нового."
     lead = conn.execute("SELECT status FROM leads WHERE id = ?", (lead_id,)).fetchone()
     if not lead or lead['status'] != 'free':
         conn.close()
@@ -286,7 +293,8 @@ def create_deal(lead_id, manager_id, amount):
 def get_deals_by_manager(manager_id):
     conn = get_db()
     deals = conn.execute("""
-        SELECT d.*, l.name AS lead_name, l.phone AS lead_phone
+        SELECT d.*, l.name AS lead_name, l.phone AS lead_phone,
+               l.yandex_url AS lead_yandex_url, l.website_url AS lead_website_url
         FROM deals d JOIN leads l ON d.lead_id = l.id
         WHERE d.manager_id = ?
         ORDER BY d.created_at DESC
@@ -299,6 +307,7 @@ def get_all_deals():
     conn = get_db()
     deals = conn.execute("""
         SELECT d.*, l.name AS lead_name, l.phone AS lead_phone,
+               l.yandex_url AS lead_yandex_url, l.website_url AS lead_website_url,
                u.display_name AS manager_name, u.username AS manager_username
         FROM deals d
         JOIN leads l ON d.lead_id = l.id

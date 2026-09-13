@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Data ─────────────────────────────────────────────────────
     let freeLeads = [];
     let myLeads = [];
+    let hasActiveLead = false;
 
     // ── Load free leads ──────────────────────────────────────────
     async function loadFreeLeads() {
@@ -40,7 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const r = await fetch('/api/leads/my');
             myLeads = await r.json();
+            // Check if user has an active lead (not deal/refused)
+            hasActiveLead = myLeads.some(l => ['taken', 'in_progress', 'callback'].includes(l.status));
             renderMyTable();
+            renderFreeTable(); // re-render to update claim buttons
         } catch (e) { console.error(e); }
     }
 
@@ -53,39 +57,28 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error(e); }
     }
 
-    // ── Render free leads table ──────────────────────────────────
+    // ── Render free leads table (ONLY name visible) ──────────────
     function renderFreeTable() {
         const tbody = document.getElementById('freeTableBody');
         const search = (document.getElementById('freeSearch')?.value || '').toLowerCase();
         const filtered = freeLeads.filter(l =>
-            (l.name || '').toLowerCase().includes(search) ||
-            (l.phone || '').includes(search)
+            (l.name || '').toLowerCase().includes(search)
         );
         document.getElementById('freeCount').textContent = filtered.length;
 
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="loading">Нет свободных клиентов</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="2" class="loading">Нет свободных клиентов</td></tr>';
             return;
         }
 
         tbody.innerHTML = filtered.map(l => `
             <tr>
-                <td class="name-cell">
-                    ${esc(l.name) || 'Без названия'}
-                    <div class="address">${esc(l.address) || ''}</div>
-                </td>
+                <td class="name-cell">${esc(l.name) || 'Без названия'}</td>
                 <td>
-                    <div class="rating">
-                        <span class="rating-val">★ ${esc(l.rating) || '-'}</span>
-                        <span class="rating-count">(${esc(l.reviews_count) || '0'})</span>
-                    </div>
-                </td>
-                <td>${phoneHtml(l.phone)}</td>
-                <td class="link-group">${linksHtml(l)}</td>
-                <td>
-                    <button class="btn btn-claim btn-sm" onclick="claimLead('${l.id}')">
-                        🚀 Взять клиента
-                    </button>
+                    ${hasActiveLead
+                        ? '<span style="color:var(--text-muted);font-size:.8rem">Завершите текущего клиента</span>'
+                        : `<button class="btn btn-claim btn-sm" onclick="claimLead('${l.id}')">🚀 Взять клиента</button>`
+                    }
                 </td>
             </tr>
         `).join('');
@@ -128,16 +121,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    // ── Render my deals ──────────────────────────────────────────
+    // ── Render my deals (with map links) ─────────────────────────
     function renderMyDeals(deals) {
         const tbody = document.getElementById('myDealsTableBody');
         if (!deals.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="loading">Пока нет сделок</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">Пока нет сделок</td></tr>';
             return;
         }
         tbody.innerHTML = deals.map(d => `
             <tr>
                 <td class="name-cell">${esc(d.lead_name)}<div class="address">${esc(d.lead_phone)}</div></td>
+                <td class="link-group">${dealLinksHtml(d)}</td>
                 <td><strong>${Number(d.amount).toLocaleString('ru')} ₽</strong></td>
                 <td>${d.commission_rate}%</td>
                 <td style="color:var(--success);font-weight:600">${Number(d.commission_amount).toLocaleString('ru')} ₽</td>
@@ -270,6 +264,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return h || '<span class="no-website">Нет</span>';
     }
 
+    function dealLinksHtml(d) {
+        let h = '';
+        const ym = d.lead_yandex_url || (d.lead_website_url && d.lead_website_url.includes('yandex.ru') ? d.lead_website_url : '');
+        if (ym) h += `<a href="${ym}" target="_blank" class="maps-link">📍 Карты</a>`;
+        return h || '<span style="color:var(--text-muted)">—</span>';
+    }
+
     function statusLabel(s) {
         const m = { free:'Свободен', taken:'Взят', in_progress:'В работе', callback:'Перезвонить', deal:'Сделка', refused:'Отказ' };
         return m[s] || s;
@@ -279,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('freeSearch')?.addEventListener('input', renderFreeTable);
 
     // ── Init ─────────────────────────────────────────────────────
+    loadMyLeads();   // load first to set hasActiveLead before rendering free table
     loadFreeLeads();
-    loadMyLeads();
     loadMyDeals();
 });

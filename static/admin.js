@@ -167,12 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDeals(deals) {
         const tbody = document.getElementById('dealsTableBody');
         if (!deals.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">Пока нет сделок</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">Пока нет сделок</td></tr>';
             return;
         }
         tbody.innerHTML = deals.map(d => `
             <tr>
                 <td class="name-cell">${esc(d.lead_name)}<div class="address">${esc(d.lead_phone)}</div></td>
+                <td class="link-group">${dealLinksHtml(d)}</td>
                 <td style="color:var(--accent-hover)">${esc(d.manager_name)}</td>
                 <td><strong>${Number(d.amount).toLocaleString('ru')} ₽</strong></td>
                 <td>${d.commission_rate}%</td>
@@ -208,6 +209,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function statusLeadLabel(s) {
         return { free:'Свободен', taken:'Взят', in_progress:'В работе', callback:'Перезвонить', deal:'Сделка', refused:'Отказ' }[s] || s;
+    }
+
+    function dealLinksHtml(d) {
+        let h = '';
+        const ym = d.lead_yandex_url || (d.lead_website_url && d.lead_website_url.includes('yandex.ru') ? d.lead_website_url : '');
+        if (ym) h += `<a href="${ym}" target="_blank" class="maps-link">📍 Карты</a>`;
+        return h || '<span style="color:var(--text-muted)">—</span>';
     }
 
     // ── Init ─────────────────────────────────────────────────────
