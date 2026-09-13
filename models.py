@@ -90,37 +90,108 @@ def create_admin(username, password):
     conn.close()
 
 
-def migrate_csv_to_db():
-    """Import leads from data.csv into SQLite if the leads table is empty."""
+def clean_phone_number(phone):
+    if not phone:
+        return ""
+    digits = ''.join(c for c in str(phone) if c.isdigit())
+    if digits.startswith('8') and len(digits) == 11:
+        digits = '7' + digits[1:]
+    return digits
+
+
+def import_leads_csv(csv_content):
+    """
+    Import new parsed leads from CSV string, skipping any duplicate leads
+    (by normalized phone, yandex_url, or lead ID).
+    Returns (added_count, skipped_count, total_count).
+    """
+    if not csv_content or not csv_content.strip():
+        return 0, 0, 0
+
     conn = get_db()
-    count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
-    if count > 0:
-        conn.close()
-        return
+    existing_rows = conn.execute("SELECT id, phone, yandex_url FROM leads").fetchall()
+    existing_ids = set()
+    existing_urls = set()
+    existing_phones = set()
 
-    if not os.path.exists(CSV_FILE_PATH):
-        conn.close()
-        return
+    for r in existing_rows:
+        if r['id']:
+            existing_ids.add(r['id'])
+        if r['yandex_url'] and r['yandex_url'].strip():
+            existing_urls.add(r['yandex_url'].strip())
+        cp = clean_phone_number(r['phone'])
+        if cp:
+            existing_phones.add(cp)
 
-    with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
-        reader = csv.DictReader(f, delimiter=';')
-        for row in reader:
-            lead_id = row.get('id', str(uuid.uuid4()))
-            if not lead_id:
-                lead_id = str(uuid.uuid4())
-            conn.execute(
-                """INSERT OR IGNORE INTO leads
-                   (id, source, name, phone, has_website, website_url, yandex_url,
-                    rating, reviews_count, address, target_result, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'free')""",
-                (lead_id, row.get('source', ''), row.get('name', ''),
-                 row.get('phone', ''), row.get('has_website', '0'),
-                 row.get('website_url', ''), row.get('yandex_url', ''),
-                 row.get('rating', ''), row.get('reviews_count', ''),
-                 row.get('address', ''), row.get('target_result', ''))
-            )
+    sample = csv_content[:2000]
+    delimiter = ';' if ';' in sample else ','
+
+    lines = [line for line in csv_content.strip().splitlines() if line.strip()]
+    if not lines:
+        conn.close()
+        return 0, 0, 0
+
+    reader = csv.DictReader(lines, delimiter=delimiter)
+
+    added = 0
+    skipped = 0
+    total = 0
+
+    for row in reader:
+        total += 1
+        lead_id = (row.get('id') or '').strip()
+        if not lead_id:
+            lead_id = str(uuid.uuid4())
+
+        source = (row.get('source') or 'yandex').strip()
+        name = (row.get('name') or '').strip()
+        phone = (row.get('phone') or '').strip()
+        has_website = (row.get('has_website') or '0').strip()
+        website_url = (row.get('website_url') or '').strip()
+        yandex_url = (row.get('yandex_url') or '').strip()
+        rating = (row.get('rating') or '').strip()
+        reviews_count = (row.get('reviews_count') or '').strip()
+        address = (row.get('address') or '').strip()
+        target_result = (row.get('target_result') or '').strip()
+
+        cp = clean_phone_number(phone)
+
+        if (cp and cp in existing_phones) or (yandex_url and yandex_url in existing_urls) or (lead_id in existing_ids):
+            skipped += 1
+            continue
+
+        conn.execute(
+            """INSERT INTO leads
+               (id, source, name, phone, has_website, website_url, yandex_url,
+                rating, reviews_count, address, target_result, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'free')""",
+            (lead_id, source, name, phone, has_website, website_url, yandex_url,
+             rating, reviews_count, address, target_result)
+        )
+
+        existing_ids.add(lead_id)
+        if yandex_url:
+            existing_urls.add(yandex_url)
+        if cp:
+            existing_phones.add(cp)
+        added += 1
+
     conn.commit()
     conn.close()
+
+    return added, skipped, total
+
+
+def migrate_csv_to_db():
+    """Import leads from data.csv into SQLite if data.csv exists."""
+    if not os.path.exists(CSV_FILE_PATH):
+        return
+    try:
+        with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+            content = f.read()
+            import_leads_csv(content)
+    except Exception as e:
+        print("Error importing data.csv:", e)
 
 
 # ── User helpers ─────────────────────────────────────────────────

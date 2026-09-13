@@ -15,7 +15,8 @@ from models import (
     get_free_leads, get_leads_by_manager, get_all_leads,
     claim_lead, release_lead, update_lead_status, reassign_lead,
     create_deal, get_deals_by_manager, get_all_deals,
-    get_manager_stats, get_admin_stats, get_user_cooldown
+    get_manager_stats, get_admin_stats, get_user_cooldown,
+    import_leads_csv
 )
 
 # ─── App config ──────────────────────────────────────────────────
@@ -317,6 +318,32 @@ def api_reassign_lead(lead_id):
 def api_free_lead(lead_id):
     release_lead(lead_id, is_admin=True)
     return jsonify({'success': True})
+
+
+@app.route('/api/admin/leads/import', methods=['POST'])
+@admin_required
+def api_import_leads():
+    content = ""
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename:
+            content = file.read().decode('utf-8-sig', errors='ignore')
+    elif request.is_json:
+        data = request.json or {}
+        content = data.get('csv_text', '')
+    else:
+        content = request.form.get('csv_text', '')
+
+    if not content.strip():
+        return jsonify({'error': 'Файл или текст CSV пуст'}), 400
+
+    added, skipped, total = import_leads_csv(content)
+    return jsonify({
+        'success': True,
+        'added': added,
+        'skipped': skipped,
+        'total': total
+    })
 
 
 @app.route('/api/admin/deals')

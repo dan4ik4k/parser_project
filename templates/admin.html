@@ -82,19 +82,22 @@
 
         <!-- TAB: LEADS -->
         <div class="tab-content" id="tab-leads">
-            <div class="controls" style="margin-bottom: 1rem;">
-                <div class="search-box">
-                    <input type="text" id="adminLeadSearch" placeholder="Поиск по названию или телефону...">
+            <div class="controls" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                <div style="display: flex; gap: .75rem; flex: 1;">
+                    <div class="search-box">
+                        <input type="text" id="adminLeadSearch" placeholder="Поиск по названию или телефону...">
+                    </div>
+                    <div class="filter-box">
+                        <select id="adminLeadFilter" class="status-select">
+                            <option value="all">Все статусы</option>
+                            <option value="free">Свободные</option>
+                            <option value="taken">Заняты</option>
+                            <option value="deal">Сделки</option>
+                            <option value="refused">Отказы</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="filter-box">
-                    <select id="adminLeadFilter" class="status-select">
-                        <option value="all">Все статусы</option>
-                        <option value="free">Свободные</option>
-                        <option value="taken">Заняты</option>
-                        <option value="deal">Сделки</option>
-                        <option value="refused">Отказы</option>
-                    </select>
-                </div>
+                <button class="btn btn-primary" id="openImportModalBtn">📥 Импорт клиентов (CSV)</button>
             </div>
             <div class="table-container">
                 <table>
@@ -133,6 +136,32 @@
                         <tr><td colspan="7" class="loading">Загрузка...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMPORT MODAL -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal-card" style="max-width: 520px;">
+            <h3>📥 Импорт новых клиентов</h3>
+            <p class="modal-lead-name">Загрузите CSV файл из парсера. Уже обзвоненные и существующие клиенты будут отфильтрованы автоматически.</p>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: .85rem; color: var(--text-muted); margin-bottom: .4rem;">Выберите CSV файл:</label>
+                <input type="file" id="importFileInput" accept=".csv,.txt" style="width: 100%; background: rgba(15,23,42,.6); padding: .5rem; border-radius: .4rem; border: 1px solid var(--panel-border); color: var(--text-main); font-size: .85rem;">
+            </div>
+            
+            <div style="text-align: center; color: var(--text-muted); font-size: .8rem; margin: .6rem 0;">— или вставьте CSV текст —</div>
+            
+            <div style="margin-bottom: 1rem;">
+                <textarea id="importCsvText" placeholder="id;source;name;phone;yandex_url... (вставьте CSV текст)" style="width: 100%; height: 100px; background: rgba(15,23,42,.6); padding: .6rem; border-radius: .4rem; border: 1px solid var(--panel-border); color: var(--text-main); font-size: .8rem; font-family: monospace; resize: vertical;"></textarea>
+            </div>
+
+            <div id="importResultBox" style="display: none; padding: .75rem; border-radius: .5rem; font-size: .88rem; margin-bottom: 1rem;"></div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="importCancelBtn">Отмена</button>
+                <button class="btn btn-success" id="importSubmitBtn">🚀 Загрузить и отфильтровать</button>
             </div>
         </div>
     </div>

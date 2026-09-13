@@ -218,6 +218,95 @@ document.addEventListener('DOMContentLoaded', () => {
         return h || '<span style="color:var(--text-muted)">—</span>';
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  IMPORT MODAL
+    // ═══════════════════════════════════════════════════════════
+
+    const importModal = document.getElementById('importModal');
+    const openImportBtn = document.getElementById('openImportModalBtn');
+    const cancelImportBtn = document.getElementById('importCancelBtn');
+    const submitImportBtn = document.getElementById('importSubmitBtn');
+    const fileInput = document.getElementById('importFileInput');
+    const csvTextArea = document.getElementById('importCsvText');
+    const resultBox = document.getElementById('importResultBox');
+
+    openImportBtn?.addEventListener('click', () => {
+        if (fileInput) fileInput.value = '';
+        if (csvTextArea) csvTextArea.value = '';
+        if (resultBox) { resultBox.style.display = 'none'; resultBox.innerHTML = ''; }
+        importModal?.classList.add('show');
+    });
+
+    cancelImportBtn?.addEventListener('click', () => {
+        importModal?.classList.remove('show');
+    });
+
+    importModal?.addEventListener('click', (e) => {
+        if (e.target === importModal) importModal.classList.remove('show');
+    });
+
+    submitImportBtn?.addEventListener('click', async () => {
+        const file = fileInput?.files[0];
+        const text = csvTextArea?.value || '';
+
+        if (!file && !text.trim()) {
+            alert('Выберите CSV файл или вставьте текст CSV');
+            return;
+        }
+
+        submitImportBtn.disabled = true;
+        submitImportBtn.textContent = '⏳ Загрузка...';
+
+        try {
+            let res;
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                const r = await fetch('/api/admin/leads/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                res = await r.json();
+            } else {
+                const r = await fetch('/api/admin/leads/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csv_text: text })
+                });
+                res = await r.json();
+            }
+
+            if (res.success) {
+                if (resultBox) {
+                    resultBox.style.display = 'block';
+                    resultBox.style.background = 'rgba(16,185,129,.12)';
+                    resultBox.style.border = '1px solid rgba(16,185,129,.3)';
+                    resultBox.style.color = 'var(--text-main)';
+                    resultBox.innerHTML = `
+                        <div style="font-weight:600;color:var(--success);margin-bottom:.3rem">✅ Импорт успешно завершен!</div>
+                        <div>📊 Всего записей в файле: <strong>${res.total}</strong></div>
+                        <div style="color:var(--success)">➕ Добавлено новых клиентов: <strong>${res.added}</strong></div>
+                        <div style="color:var(--warning)">⏭️ Пропущено (дубликаты/уже есть): <strong>${res.skipped}</strong></div>
+                    `;
+                }
+                loadAllLeads();
+            } else {
+                if (resultBox) {
+                    resultBox.style.display = 'block';
+                    resultBox.style.background = 'rgba(239,68,68,.12)';
+                    resultBox.style.border = '1px solid rgba(239,68,68,.3)';
+                    resultBox.style.color = 'var(--danger)';
+                    resultBox.textContent = res.error || 'Ошибка загрузки';
+                }
+            }
+        } catch(e) {
+            alert('Ошибка при импорте');
+        } finally {
+            submitImportBtn.disabled = false;
+            submitImportBtn.textContent = '🚀 Загрузить и отфильтровать';
+        }
+    });
+
     // ── Init ─────────────────────────────────────────────────────
     loadUsers();
     loadAllLeads();
