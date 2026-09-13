@@ -22,6 +22,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Memo toggle ─────────────────────────────────────────────
+    const memoHeader = document.getElementById('memoHeader');
+    const memoBody = document.getElementById('memoBody');
+    const toggleMemoBtn = document.getElementById('toggleMemoBtn');
+    if (memoHeader && memoBody) {
+        memoHeader.addEventListener('click', () => {
+            memoBody.classList.toggle('collapsed');
+            if (toggleMemoBtn) {
+                toggleMemoBtn.textContent = memoBody.classList.contains('collapsed') ? '► Показать памятку' : '▼ Скрыть / Показать';
+            }
+        });
+    }
+
     // ── Data ─────────────────────────────────────────────────────
     let freeLeads = [];
     let myLeads = [];
@@ -68,10 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const r = await fetch('/api/leads/my');
             myLeads = await r.json();
-            // Check if user has an active lead (not deal/refused)
             hasActiveLead = myLeads.some(l => ['taken', 'in_progress', 'callback'].includes(l.status));
             renderMyTable();
-            renderFreeTable(); // re-render to update claim buttons
+            renderFreeTable();
         } catch (e) { console.error(e); }
     }
 
@@ -102,9 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
                 <td class="name-cell">${esc(l.name) || 'Без названия'}</td>
                 <td>
-                    ${hasActiveLead
-                        ? '<span style="color:var(--text-muted);font-size:.8rem">Завершите текущего клиента</span>'
-                        : cooldownRemaining > 0
+                    ${cooldownRemaining > 0
                         ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.75">⏳ КД: ${cooldownRemaining} сек</button>`
                         : `<button class="btn btn-claim btn-sm" onclick="claimLead('${l.id}')">🚀 Взять клиента</button>`
                     }

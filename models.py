@@ -302,16 +302,8 @@ def get_user_cooldown(user_id, cooldown_seconds=60):
 
 
 def claim_lead(lead_id, manager_id):
-    """Atomically claim a free lead for the given manager (taxi-style). Limit: 1 active client. 1-min cooldown."""
+    """Atomically claim a free lead for the given manager (taxi-style). 1-min cooldown."""
     conn = get_db()
-    active = conn.execute(
-        "SELECT COUNT(*) FROM leads WHERE assigned_to = ? AND status IN ('taken','in_progress','callback')",
-        (manager_id,)
-    ).fetchone()[0]
-    if active > 0:
-        conn.close()
-        return False, "У вас уже есть активный клиент. Завершите работу с ним, прежде чем брать нового."
-
     cooldown = get_user_cooldown(manager_id, 60)
     if cooldown > 0:
         conn.close()
