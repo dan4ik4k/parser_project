@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash
 from models import (
     init_db, create_admin, migrate_csv_to_db,
     get_user_by_id, get_user_by_username, create_user, get_all_users,
-    update_user_status, update_user_commission,
+    update_user_status, update_user_commission, update_user_profile,
     get_free_leads, get_leads_by_manager, get_all_leads,
     claim_lead, release_lead, update_lead_status, reassign_lead,
     create_deal, get_deals_by_manager, get_all_deals, approve_deal, reject_deal,
@@ -300,6 +300,28 @@ def api_update_commission(user_id):
         return jsonify({'error': 'Некорректный процент'}), 400
     update_user_commission(user_id, rate)
     return jsonify({'success': True})
+
+
+@app.route('/api/admin/users/<int:user_id>/edit', methods=['POST'])
+@admin_required
+def api_edit_user_profile(user_id):
+    data = request.json or {}
+    display_name = data.get('display_name', '').strip()
+    username = data.get('username', '').strip()
+    contact = data.get('contact', '').strip()
+    password = data.get('password', '').strip()
+    try:
+        commission_rate = float(data.get('commission_rate', 15.0))
+    except (ValueError, TypeError):
+        commission_rate = 15.0
+
+    if not display_name or not username:
+        return jsonify({'error': 'Имя и логин обязательны'}), 400
+
+    ok, msg = update_user_profile(user_id, display_name, username, contact, commission_rate, password)
+    if ok:
+        return jsonify({'success': True})
+    return jsonify({'error': msg}), 400
 
 
 @app.route('/api/admin/leads/<lead_id>/reassign', methods=['POST'])

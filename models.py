@@ -251,6 +251,29 @@ def update_user_commission(user_id, rate):
     conn.close()
 
 
+def update_user_profile(user_id, display_name, username, contact, commission_rate, password=None):
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM users WHERE username = ? AND id != ?", (username, user_id)).fetchone()
+    if existing:
+        conn.close()
+        return False, "Логин уже занят другим пользователем"
+
+    if password and password.strip():
+        pwd_hash = generate_password_hash(password.strip())
+        conn.execute(
+            "UPDATE users SET display_name = ?, username = ?, contact = ?, commission_rate = ?, password_hash = ? WHERE id = ?",
+            (display_name, username, contact, commission_rate, pwd_hash, user_id)
+        )
+    else:
+        conn.execute(
+            "UPDATE users SET display_name = ?, username = ?, contact = ?, commission_rate = ? WHERE id = ?",
+            (display_name, username, contact, commission_rate, user_id)
+        )
+    conn.commit()
+    conn.close()
+    return True, "Профиль обновлен"
+
+
 # ── Lead helpers ─────────────────────────────────────────────────
 
 def get_free_leads():

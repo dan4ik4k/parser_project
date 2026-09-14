@@ -48,18 +48,68 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
                 <td style="color:var(--purple);font-size:.85rem">${esc(u.referred_by) || '—'}</td>
                 <td class="action-cell">
+                    <button class="btn btn-secondary btn-inline" onclick="openEditUserModal(${u.id})">✏️ Профиль</button>
                     ${u.status === 'pending' ? `
-                        <button class="btn btn-success btn-inline" onclick="approveUser(${u.id})">✅ Выдать доступ</button>
+                        <button class="btn btn-success btn-inline" onclick="approveUser(${u.id})">✅ Доступ</button>
                         <button class="btn btn-danger btn-inline" onclick="blockUser(${u.id})">🚫 Отклонить</button>
                     ` : u.status === 'approved' ? `
-                        <button class="btn btn-danger btn-inline" onclick="blockUser(${u.id})">🚫 Заблокировать</button>
+                        <button class="btn btn-danger btn-inline" onclick="blockUser(${u.id})">🚫 Блок</button>
                     ` : `
-                        <button class="btn btn-success btn-inline" onclick="approveUser(${u.id})">✅ Разблокировать</button>
+                        <button class="btn btn-success btn-inline" onclick="approveUser(${u.id})">✅ Разблок</button>
                     `}
                 </td>
             </tr>
         `).join('');
     }
+
+    window.openEditUserModal = function(id) {
+        const u = allUsers.find(x => x.id === id);
+        if (!u) return;
+        document.getElementById('editUserId').value = u.id;
+        document.getElementById('editUserTitle').textContent = `Редактирование профиля: ${u.display_name}`;
+        document.getElementById('editUserDisplayName').value = u.display_name || '';
+        document.getElementById('editUserUsername').value = u.username || '';
+        document.getElementById('editUserContact').value = u.contact || '';
+        document.getElementById('editUserCommissionRate').value = u.commission_rate || 15;
+        document.getElementById('editUserPassword').value = '';
+        document.getElementById('editUserModal').classList.add('show');
+    };
+
+    document.getElementById('editUserCancelBtn')?.addEventListener('click', () => {
+        document.getElementById('editUserModal').classList.remove('show');
+    });
+
+    document.getElementById('editUserSaveBtn')?.addEventListener('click', async () => {
+        const id = document.getElementById('editUserId').value;
+        const display_name = document.getElementById('editUserDisplayName').value.trim();
+        const username = document.getElementById('editUserUsername').value.trim();
+        const contact = document.getElementById('editUserContact').value.trim();
+        const commission_rate = parseFloat(document.getElementById('editUserCommissionRate').value) || 15;
+        const password = document.getElementById('editUserPassword').value.trim();
+
+        if (!display_name || !username) {
+            alert('Имя и логин обязательны');
+            return;
+        }
+
+        try {
+            const r = await fetch(`/api/admin/users/${id}/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ display_name, username, contact, commission_rate, password })
+            });
+            const data = await r.json();
+            if (data.success) {
+                document.getElementById('editUserModal').classList.remove('show');
+                loadUsers();
+                alert('Профиль сотрудника успешно обновлен!');
+            } else {
+                alert(data.error || 'Ошибка при сохранении профиля');
+            }
+        } catch(e) {
+            alert('Ошибка сети');
+        }
+    });
 
     window.approveUser = async function(id) {
         await fetch(`/api/admin/users/${id}/approve`, { method: 'POST' });
